@@ -3,10 +3,29 @@
 namespace App\Exceptions;
 
 use Illuminate\Foundation\Exceptions\Handler as ExceptionHandler;
+use Illuminate\Auth\AuthenticationException;
 use Throwable;
 
 class Handler extends ExceptionHandler
 {
+        /**
+     * A list of exception types with their corresponding custom log levels.
+     *
+     * @var array<class-string<\Throwable>, \Psr\Log\LogLevel::*>
+     */
+    protected $levels = [
+        //
+    ];
+
+    /**
+     * A list of the exception types that are not reported.
+     *
+     * @var array<int, class-string<\Throwable>>
+     */
+    protected $dontReport = [
+        //
+    ];
+
     /**
      * The list of the inputs that are never flashed to the session on validation exceptions.
      *
@@ -26,5 +45,25 @@ class Handler extends ExceptionHandler
         $this->reportable(function (Throwable $e) {
             //
         });
+    }
+
+    /**
+     * Handle unauthenticated users for API requests
+     */
+    protected function unauthenticated($request, AuthenticationException $exception)
+    {
+        // Check if request is for API
+        if ($request->expectsJson() || $request->is('api/*')) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Unauthenticated. Please provide a valid access token.',
+                'errors' => [
+                    'token' => ['The provided token is invalid or has expired.']
+                ]
+            ], 401);
+        }
+
+        // For web requests, redirect to login (if you have web routes)
+        return redirect()->guest(route('login'));
     }
 }
