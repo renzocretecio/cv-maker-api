@@ -135,4 +135,25 @@ class AuthController extends Controller
             'User profile retrieved successfully'
         );
     }
+
+    public function providerRegistration(Request $request): JsonResponse
+    {
+        try {
+            $result = $this->authService->providerRegistration($request);
+
+            return ApiResponseService::created([
+                'user' => $result['user'],
+                'access_token' => $result['access_token'],
+                'refresh_token' => $result['refresh_token'],
+                'token_type' => 'Bearer',
+                'expires_in' => $result['expires_in'],
+            ], 'User registered succesfully');
+        } catch (Exception $e) {
+            return ApiResponseService::error(
+                'Registration failed: ' . $e->getMessage(),
+                null,
+                500
+            );
+        }
+    }
 }

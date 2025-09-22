@@ -142,4 +142,59 @@ class AuthService
         }
         Cache::forget("user_refresh_tokens:{$user->id}");
     }
+
+    public function providerRegistration(object $userData): array
+    {
+        $this->validateProvider($userData->provider);
+
+        $existing = $this->user
+        ->where('email', $userData->email)
+        ->orWhereHas('providers', function ($q) use ($userData) {
+            $q->where('provider', $userData->provider)
+              ->where('provider_id', $userData->provider_id);
+        })
+        ->first();
+
+        if ($existing) {
+            throw new Exception('User already exists', 409);
+        }
+
+        return \DB::transaction(function () use ($userData) {
+            $user = $this->user->firstOrCreate(
+                ['email' => $userData->email],
+                [
+                    'name'              => $userData->name,
+                    'email_verified_at' => Carbon::now(),
+                ]
+            );
+
+            $user->providers()->updateOrCreate(
+                [
+                    'provider'    => $userData->provider,
+                    'provider_id' => $userData->provider_id,
+                ],
+                [
+                    'avatar' => $userData->avatar,
+                ]
+            );
+
+            $tokens = $this->generateTokenPair($user);
+
+            return [
+                'user'          => $user->fresh(['providers']),
+                'access_token'  => $tokens['access_token'],
+                'refresh_token' => $tokens['refresh_token'],
+                'expires_in'    => self::ACCESS_TOKEN_EXPIRES_IN * 60,
+            ];
+        });
+    }
+
+    protected function validateProvider($provider)
+    {
+        $allowed = ['github', 'google'];
+
+        if (!in_array($provider, $allowed, true)) {
+            throw new Exception("Provider '{$provider}' is not supported.", 422);
+        }
+    }
 }
